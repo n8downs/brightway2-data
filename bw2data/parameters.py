@@ -753,6 +753,16 @@ class ActivityParameter(ParameterBase):
             if names:
                 chain.append({"kind": "activity", "group": new_group, "names": names})
 
+        parameter_names = set()
+        for key in ParameterizedExchange.load(group).keys():
+            exchange = ExchangeDataset.get(id=key).data
+            variable_name = exchange.get("variable name", None)
+            if variable_name in needed:
+                parameter_names.add(variable_name)
+                needed.remove(variable_name)
+        # because these are self-contained, the don't need to be included in the chain?
+        # in any event, including them causes a crash when inserting into GroupDependency
+
         if needed and include_self:
             names = set()
             included = needed.intersection(data)
@@ -1289,13 +1299,13 @@ class ParameterManager:
             ActivityParameter.insert_dummy(group, activity)
 
         for exc in get_activity((activity[0], activity[1])).exchanges():
-            if "formula" in exc:
+            if "formula" in exc or "variable name" in exc:
                 try:
                     obj = ParameterizedExchange.get(exchange=exc._document.id)
                 except ParameterizedExchange.DoesNotExist:
                     obj = ParameterizedExchange(exchange=exc._document.id)
                 obj.group = group
-                obj.formula = exc["formula"]
+                obj.formula = exc.get("formula", exc.get("amount", 1))
                 obj.save()
                 if "original_amount" not in exc:
                     exc["original_amount"] = exc["amount"]
